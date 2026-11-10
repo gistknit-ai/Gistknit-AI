@@ -59,3 +59,5 @@ label.f{display:block;font-weight:600;margin:14px 0 6px}
 .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
 @media (prefers-reduced-motion:no-preference){.msg{animation:in .2s ease-out}@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+
+.srcs .snip{display:block;margin-top:4px;font-size:.85rem;color:var(--mute);font-style:normal;border-left:3px solid var(--knot);padding-left:8px}

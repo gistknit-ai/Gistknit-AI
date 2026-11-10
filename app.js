@@ -1,4 +1,4 @@
-/* GistKnit AI - Step 1: UI with demo answers. AI is not connected yet. */
+/* GistKnit AI - Step 2: documents + questions with sources (backend needed). If config.js has no API url, demo mode runs. */
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const store={
@@ -13,6 +13,23 @@ const S={
   thread:[],mode:'chat',busy:false,signup:false
 };
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const API=(window.GK_API||'').replace(/\/$/,'');
+S.cid=store.get('cid',null);
+if(!S.cid){S.cid=(self.crypto&&crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2)).replace(/-/g,'');store.set('cid',S.cid)}
+S.upMsg='';S.loaded=false;
+async function api(path,opts={}){
+  opts.headers=Object.assign({'X-Client-Id':S.cid},opts.headers||{});
+  let r;
+  try{r=await fetch(API+path,opts)}catch(e){throw new Error('Cannot reach the server. If it was idle, wait 1 minute and try again.')}
+  let j=null;try{j=await r.json()}catch(e){}
+  if(!r.ok)throw new Error((j&&j.detail)||'Server error '+r.status);
+  return j;
+}
+async function loadDocs(){
+  if(!API)return;
+  try{S.docs=await api('/docs-list');S.loaded=true}catch(e){S.upMsg=e.message}
+  if(route()==='library')render();
+}
 const ICON={
   home:'<path d="M4 11l8-7 8 7v9H4z"/>',
   chat:'<path d="M4 5h16v11H9l-5 4z"/>',
@@ -45,6 +62,7 @@ function render(){
   const v=({home:vHome,chat:vChat,library:vLibrary,history:vHistory,settings:vSettings,login:vLogin})[r]||vHome;
   $('#view').innerHTML=v();
   if(r==='chat')paintMsgs();
+  if(r==='library'&&API&&!S.loaded)loadDocs();
   window.scrollTo(0,0);
 }
 
@@ -63,7 +81,7 @@ function vHome(){
 }
 
 function vChat(){
-  return `<div class="note">Demo mode: answers are samples. The real AI comes in the next step.</div>
+  return `${API?'':'<div class="note">Demo mode: answers are samples. Add your server link in config.js for real answers.</div>'}
   <div id="msgs" aria-live="polite"></div>
   <form class="askbar" id="askform">
     <input type="text" id="ask" placeholder="Ask a follow-up" aria-label="Message" autocomplete="off">
@@ -78,7 +96,7 @@ function paintMsgs(){
     if(m.role==='u')return `<div class="msg u">${esc(m.text)}</div>`;
     const steps=m.steps?`<ul class="steps">${m.steps.map(s=>`<li class="${s.done?'':'wait'}">${esc(s.t)}</li>`).join('')}</ul>`:'';
     const body=esc(m.text).replace(/\[(\d)\]/g,(a,n)=>m.done?`<button class="knot" data-act="knot" data-i="${i}" data-n="${n}" aria-label="Source ${n}">${n}</button>`:'');
-    const srcs=m.done?`<ol class="srcs" id="srcs${i}">${m.src.map((s,k)=>`<li data-n="${k+1}"><b>${k+1}. ${esc(s.t)}</b><span>${esc(s.s)}</span></li>`).join('')}</ol>
+    const srcs=m.done&&m.src.length?`<ol class="srcs" id="srcs${i}">${m.src.map((s,k)=>`<li data-n="${k+1}"><b>${k+1}. ${esc(s.t)}</b><span>${esc(s.s)}</span>${s.q?`<em class="snip">${esc(s.q)}</em>`:''}</li>`).join('')}</ol>
       <div class="actions"><button data-act="copy" data-i="${i}">Copy answer</button><button data-act="new">New conversation</button></div>`:'';
     return `<div class="msg a">${steps}<div>${body}</div>${srcs}</div>`;
   }).join('');
@@ -88,33 +106,52 @@ function paintMsgs(){
 async function ask(q){
   if(S.busy||!q.trim())return;
   S.busy=true;
-  const ans=demoAnswer(q);
-  const m={role:'a',text:'',src:ans.src,done:false,steps:null};
+  const m={role:'a',text:'',src:[],done:false,steps:null};
   S.thread.push({role:'u',text:q},m);
-  if(S.mode==='research'){
-    m.steps=['Searching sources','Reading the best matches','Checking claims against sources'].map(t=>({t,done:false}));
+  let ans;
+  if(API){
+    m.steps=(S.mode==='research'?['Searching your documents','Reading the best matches','Writing the answer with sources']:['Reading your documents']).map(t=>({t,done:false}));
     paintMsgs();
-    for(const s of m.steps){await sleep(650);s.done=true;paintMsgs()}
-  }else paintMsgs();
+    try{
+      const p=api('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,mode:S.mode,style:S.prefs.style})});
+      for(let i=0;i<m.steps.length-1;i++){await sleep(700);m.steps[i].done=true;paintMsgs()}
+      ans=await p;
+    }catch(e){
+      m.steps=null;m.text=e.message;m.done=true;S.busy=false;paintMsgs();
+      const b=$('#askform button');if(b)b.disabled=false;return;
+    }
+    m.steps.forEach(s=>s.done=true);
+  }else{
+    ans=demoAnswer(q);
+    if(S.mode==='research'){
+      m.steps=['Searching sources','Reading the best matches','Checking claims against sources'].map(t=>({t,done:false}));
+      paintMsgs();
+      for(const s of m.steps){await sleep(650);s.done=true;paintMsgs()}
+    }else paintMsgs();
+  }
+  m.src=ans.src||[];
   const words=ans.text.split(' ');
   for(let i=0;i<words.length;i++){
     m.text+=(i?' ':'')+words[i];
-    if(i%3===0||i===words.length-1)paintMsgs();
-    await sleep(30);
+    if(i%4===0||i===words.length-1)paintMsgs();
+    await sleep(22);
   }
-  m.done=true;m.steps=m.steps;S.busy=false;
-  S.history.unshift({id:Date.now(),q,a:ans.text,src:ans.src,mode:S.mode,t:new Date().toISOString()});
+  m.done=true;S.busy=false;
+  S.history.unshift({id:Date.now(),q,a:ans.text,src:m.src,mode:S.mode,t:new Date().toISOString()});
   S.history=S.history.slice(0,50);store.set('history',S.history);
   if(route()==='chat'){paintMsgs();const b=$('#askform button');if(b)b.disabled=false}
 }
 
 function vLibrary(){
-  const list=S.docs.length?`<ul class="list">${S.docs.map((d,i)=>`<li><div class="main"><b>${esc(d.name)}</b><small>${(d.size/1024).toFixed(0)} KB, added ${new Date(d.t).toLocaleDateString()}</small></div><button class="x" data-act="deldoc" data-i="${i}" aria-label="Remove ${esc(d.name)}">Remove</button></li>`).join('')}</ul>`
-    :'<div class="empty">Your library is empty. Add a PDF or document to ask questions about it.</div>';
+  const list=S.docs.length?`<ul class="list">${S.docs.map((d,i)=>`<li><div class="main"><b>${esc(d.name)}</b><small>${(d.size/1024).toFixed(0)} KB${d.pages?', '+d.pages+' page'+(d.pages>1?'s':''):''}, added ${new Date(d.t).toLocaleDateString()}</small></div><button class="x" data-act="deldoc" data-i="${i}" aria-label="Remove ${esc(d.name)}">Remove</button></li>`).join('')}</ul>`
+    :'<div class="empty">Your library is empty. Add a PDF or text file to ask questions about it.</div>';
+  const note=API?'<div class="note">Files stay on the server while it is running. After a long idle the server restarts and you may need to add files again.</div>'
+    :'<div class="note">Demo mode: files are listed here but not read yet. Add your server link in config.js to turn on real answers.</div>';
   return `<h2>Knowledge library</h2>
   <p class="lead">Documents you add here become sources for your answers.</p>
-  <div class="note">Demo mode: files are listed here but not read yet. Reading comes in the next step.</div>
-  <label class="drop">Add documents (PDF, DOCX, TXT)<input type="file" id="file" multiple accept=".pdf,.doc,.docx,.txt"></label>
+  ${note}
+  ${S.upMsg?`<div class="note" role="alert">${esc(S.upMsg)}</div>`:''}
+  <label class="drop">${S.busy?'Working...':'Add documents (PDF or TXT, up to 10 MB)'}<input type="file" id="file" multiple accept=".pdf,.txt"></label>
   ${list}`;
 }
 
@@ -163,7 +200,7 @@ document.addEventListener('click',e=>{
   if(a==='knot'){const ol=$('#srcs'+b.dataset.i);ol.querySelectorAll('li').forEach(li=>li.classList.toggle('hl',li.dataset.n===b.dataset.n));return}
   if(a==='copy'){const t=S.thread[i].text;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{b.textContent='Copied'}).catch(()=>{b.textContent='Copy failed'});return}
   if(a==='new'){S.thread=[];go('home');return}
-  if(a==='deldoc'){S.docs.splice(i,1);store.set('docs',S.docs);render();return}
+  if(a==='deldoc'){const d=S.docs[i];if(API&&d.id){api('/docs/'+d.id,{method:'DELETE'}).then(()=>loadDocs()).catch(e=>{S.upMsg=e.message;render()})}else{S.docs.splice(i,1);store.set('docs',S.docs);render()}return}
   if(a==='openh'){const h=S.history[i];S.thread=[{role:'u',text:h.q},{role:'a',text:h.a,src:h.src,done:true}];go('chat');render();return}
   if(a==='delh'){S.history.splice(i,1);store.set('history',S.history);render();return}
   if(a==='clearh'){if(confirm('Delete all research history?')){S.history=[];store.set('history',[]);render()}return}
@@ -181,8 +218,16 @@ document.addEventListener('submit',e=>{
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='file'){
-    [...e.target.files].forEach(f=>S.docs.unshift({name:f.name,size:f.size,t:new Date().toISOString()}));
-    store.set('docs',S.docs);render();
+    const files=[...e.target.files];e.target.value='';
+    if(!API){files.forEach(f=>S.docs.unshift({name:f.name,size:f.size,t:new Date().toISOString()}));store.set('docs',S.docs);render();return}
+    (async()=>{
+      S.busy=true;S.upMsg='';render();
+      for(const f of files){
+        const fd=new FormData();fd.append('file',f);
+        try{await api('/upload',{method:'POST',body:fd})}catch(err){S.upMsg=f.name+': '+err.message}
+      }
+      S.busy=false;await loadDocs();render();
+    })();
   }
   if(e.target.id==='style'){S.prefs.style=e.target.value;store.set('prefs',S.prefs)}
 });
