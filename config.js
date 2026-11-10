@@ -1,3 +1,2 @@
-// Render par backend deploy hone ke baad uska URL yahan daalo (aakhir me / mat lagana).
-// Example: window.GK_API = "https://gistknit-api.onrender.com";
+// Backend (Render) ka URL. Aakhir me / mat lagana.
 window.GK_API = "https://gistknit-ai.onrender.com";

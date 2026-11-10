@@ -61,3 +61,19 @@ label.f{display:block;font-weight:600;margin:14px 0 6px}
 @media (prefers-reduced-motion:no-preference){.msg{animation:in .2s ease-out}@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
 
 .srcs .snip{display:block;margin-top:4px;font-size:.85rem;color:var(--mute);font-style:normal;border-left:3px solid var(--knot);padding-left:8px}
+.hero{text-align:left;padding:18px 0 6px}
+.msg.a p{margin:0 0 .6rem}.msg.a ul,.msg.a ol{margin:0 0 .6rem;padding-left:1.3rem}.msg.a li{margin-bottom:.25rem}
+.msg.a h3{margin:.4rem 0 .3rem}.msg.a code{background:var(--paper);padding:1px 5px;border-radius:5px;font-size:.9em}
+.msg.err{color:#8A2F22}
+.meta{color:var(--mute);font-size:.85rem;margin:0 0 8px}
+.srcs a{color:var(--thread-d);text-decoration:underline;text-underline-offset:2px}
+.composer{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom));background:var(--paper);padding:8px 0 10px}
+.ctl{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.ctl button.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;font-size:.88rem;cursor:pointer;font-weight:600}
+.ctl button.chip.on{background:var(--thread);border-color:var(--thread);color:#fff}
+.ctl .sep{flex:1}
+.compose{display:flex;gap:8px;align-items:flex-end}
+.compose textarea{min-height:46px;max-height:130px;resize:none;padding:11px 14px}
+.attach{flex:0 0 auto;width:46px;height:46px;display:grid;place-items:center;border:1px solid var(--line);background:var(--card);border-radius:12px;font-size:1.5rem;color:var(--thread-d);cursor:pointer}
+.attach input{display:none}
+.upstat{font-size:.88rem;color:var(--mute);margin-bottom:6px}
