@@ -107,6 +107,8 @@ def ev(**k):
 
 
 def llm_error(status, text, vision=False):
+    if "ERR_NGROK_3200" in text or "is offline" in text:
+        return "Your AI server is offline right now. Start it in Colab (Run all) and try again."
     if vision and status == 404:
         return "The photo-reading model is not installed on your AI server yet. Run the photo-model cell in Colab, then try again."
     detail = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text)).strip()[:160]
