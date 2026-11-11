@@ -1,16 +1,11 @@
-GistKnit AI - Step 4 (insaan jaisa chat, typing dots, streaming, coding, photo, internet research)
-Created by Founder Ved Prakash
+GistKnit AI - Stable update
 
-GITHUB PAR UPLOAD (repo ke root me, purani files replace karo):
-  index.html, style.css, app.js, config.js
-  backend/main.py, backend/rag.py, backend/web.py, backend/requirements.txt
+1) GitHub: backend/main.py replace karo (sirf yehi file badli hai), commit karo, Render me Manual Deploy.
+2) Colab: GistKnit_Model_Server_Stable.ipynb upload karo.
+   - Runtime > T4 GPU
+   - Key icon > Secret: NGROK_TOKEN = apna NAYA ngrok Authtoken (Notebook access ON)
+   - Run all (Drive ki permission Allow karo)
+3) Render me LLM_BASE_URL badalna NAHI hai: tumhara fixed address handbrake-haiku-humorist.ngrok-free.dev hi rahega.
+4) (optional) uptimerobot.com par free monitor: https://gistknit-ai.onrender.com/health, har 5 minute. Isse Render so nahi jata.
 
-RENDER: kuch naya variable zaroori nahi. Manual Deploy > Deploy latest commit.
-  (optional) LLM_VISION_MODEL = qwen2.5vl:7b   (photo wale model ka naam, default yehi hai)
-
-COLAB (photo + behtar jawab ke liye):
-  Cell 5 (running...) ko Stop karo, naya GistKnit_Model_Server.ipynb ka Cell 2 chalao
-  (ye context 8192 karta hai aur photo model download karta hai), phir Cell 5 dobara chalao.
-  ngrok ka address same rehta hai agar Cell 3 dobara na chalao.
-
-Firebase rules: is step me zarurat nahi.
+Firebase rules: is update me zarurat nahi.
