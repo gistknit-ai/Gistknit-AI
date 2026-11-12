@@ -1,11 +1,10 @@
-GistKnit AI - Stable update
+GistKnit AI v1.0 - professional look (sidebar, + menu, dark mode, settings)
+Founded by Ved Prakash
 
-1) GitHub: backend/main.py replace karo (sirf yehi file badli hai), commit karo, Render me Manual Deploy.
-2) Colab: GistKnit_Model_Server_Stable.ipynb upload karo.
-   - Runtime > T4 GPU
-   - Key icon > Secret: NGROK_TOKEN = apna NAYA ngrok Authtoken (Notebook access ON)
-   - Run all (Drive ki permission Allow karo)
-3) Render me LLM_BASE_URL badalna NAHI hai: tumhara fixed address handbrake-haiku-humorist.ngrok-free.dev hi rahega.
-4) (optional) uptimerobot.com par free monitor: https://gistknit-ai.onrender.com/health, har 5 minute. Isse Render so nahi jata.
+GITHUB PAR UPLOAD (repo ke root me, purani files replace karo):
+  index.html, style.css, app.js, config.js
+  backend/main.py, backend/web.py, backend/rag.py, backend/requirements.txt
 
+Phir Render me Manual Deploy > Deploy latest commit.
+config.js me tumhara Render URL pehle se hai. Colab ka Cell 5 chalta rehna chahiye.
 Firebase rules: is update me zarurat nahi.
