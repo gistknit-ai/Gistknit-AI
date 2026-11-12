@@ -1,4 +1,5 @@
 """GistKnit AI backend (Step 5): human-like streaming chat, photos, coding mode, web research with sources."""
+import contextvars
 import json
 import os
 import re
@@ -15,7 +16,8 @@ from pydantic import BaseModel
 import rag
 import web
 
-# Apna model server (Ollama / vLLM). Koi third-party AI company ka API nahi.
+# AI providers: Render ke Environment Variables me keys daalo (GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY).
+# Optional: apna model server (LLM_BASE_URL) bhi chalta hai.
 LLM_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")   # example: https://xxxx.ngrok-free.app/v1
 LLM_MODEL = os.environ.get("LLM_MODEL", "qwen2.5:7b")
 LLM_VISION_MODEL = os.environ.get("LLM_VISION_MODEL", "qwen2.5vl:7b")   # photos samajhne wala model
@@ -24,7 +26,39 @@ ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")
 
 MAX_FILE = 10 * 1024 * 1024
 MAX_DOCS = 10
-ASKS_PER_HOUR = 30
+ASKS_PER_HOUR = 20
+ASKS_PER_DAY = 40
+
+PROV = {}
+PREF = contextvars.ContextVar("pref", default="auto")
+
+
+def _add(name, url, key_env, model_env, model, vision):
+    key = os.environ.get(key_env, "")
+    if key:
+        PROV[name] = {"url": url, "key": key, "model": os.environ.get(model_env, model),
+                      "vision": os.environ.get(model_env + "_VISION", vision)}
+
+
+_add("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_API_KEY", "GEMINI_MODEL", "gemini-2.5-flash", "gemini-2.5-flash")
+_add("groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY", "GROQ_MODEL", "llama-3.3-70b-versatile", "")
+_add("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free", "")
+if LLM_URL:
+    PROV["own"] = {"url": LLM_URL, "key": LLM_KEY, "model": LLM_MODEL, "vision": LLM_VISION_MODEL}
+
+
+def chain(vision=False):
+    """Providers in order. User ka chuna hua pehle, baaki fallback."""
+    names = [n for n in ("gemini", "groq", "openrouter", "own") if n in PROV]
+    pref = PREF.get()
+    if pref in names:
+        names = [pref] + [n for n in names if n != pref]
+    out = []
+    for n in names:
+        m = PROV[n]["vision"] if vision else PROV[n]["model"]
+        if m:
+            out.append((n, PROV[n]["url"], PROV[n]["key"], m))
+    return out
 
 app = FastAPI(title="GistKnit AI")
 app.add_middleware(
@@ -47,7 +81,7 @@ def client(cid):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "ai": bool(LLM_URL), "model": LLM_MODEL}
+    return {"ok": True, "ai": bool(PROV), "providers": list(PROV)}
 
 
 @app.get("/docs-list")
@@ -97,6 +131,7 @@ class AskBody(BaseModel):
     history: list[Msg] = []
     images: list[str] = []    # photos as data:image/... (max 3)
     code: bool = False        # coding mode
+    model: str = "auto"       # "auto", "gemini", "groq", "openrouter"
 
 
 class LLMError(Exception):
@@ -109,49 +144,69 @@ def ev(**k):
 
 def llm_error(status, text, vision=False):
     if vision and status == 404:
-        return "The photo-reading model is not installed on your AI server yet. Run the photo-model cell in Colab, then try again."
+        return "Photo reading is not available on the current AI provider. Try the Gemini model."
     detail = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text)).strip()[:160]
     return f"AI server error ({status}). {detail}"
 
 
-def _headers():
-    return {"ngrok-skip-browser-warning": "true", **({"Authorization": f"Bearer {LLM_KEY}"} if LLM_KEY else {})}
+def _hdr(key):
+    return {"ngrok-skip-browser-warning": "true", **({"Authorization": f"Bearer {key}"} if key else {})}
 
 
-async def llm(http, messages, max_tokens=700, temperature=0.2, model=None):
-    try:
-        r = await http.post(LLM_URL + "/chat/completions", headers=_headers(),
-                            json={"model": model or LLM_MODEL, "messages": messages,
-                                  "temperature": temperature, "max_tokens": max_tokens})
-    except httpx.HTTPError:
-        raise LLMError("Could not reach your AI server. Is Colab running?")
-    if r.status_code != 200:
-        raise LLMError(llm_error(r.status_code, r.text))
-    return r.json()["choices"][0]["message"]["content"].strip()
+NO_AI = "No AI is connected yet. Add GEMINI_API_KEY or GROQ_API_KEY in Render > Environment."
 
 
-async def llm_stream(http, messages, max_tokens, model, temperature=0.5):
-    payload = {"model": model, "messages": messages, "temperature": temperature,
-               "max_tokens": max_tokens, "stream": True}
-    try:
-        async with http.stream("POST", LLM_URL + "/chat/completions", headers=_headers(), json=payload) as r:
-            if r.status_code != 200:
-                body = (await r.aread()).decode("utf-8", "ignore")
-                raise LLMError(llm_error(r.status_code, body, vision=(model == LLM_VISION_MODEL)))
-            async for line in r.aiter_lines():
-                if not line.startswith("data:"):
+async def llm(http, messages, max_tokens=700, temperature=0.2, vision=False):
+    last = NO_AI
+    for name, url, key, model in chain(vision):
+        try:
+            r = await http.post(url + "/chat/completions", headers=_hdr(key),
+                                json={"model": model, "messages": messages,
+                                      "temperature": temperature, "max_tokens": max_tokens})
+        except httpx.HTTPError:
+            last = f"Could not reach {name}."
+            continue
+        if r.status_code != 200:
+            last = llm_error(r.status_code, r.text, vision)
+            continue
+        try:
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            last = f"{name} sent an unreadable reply."
+    raise LLMError(last)
+
+
+async def llm_stream(http, messages, max_tokens, vision=False, temperature=0.5):
+    last = NO_AI
+    for name, url, key, model in chain(vision):
+        payload = {"model": model, "messages": messages, "temperature": temperature,
+                   "max_tokens": max_tokens, "stream": True}
+        got = False
+        try:
+            async with http.stream("POST", url + "/chat/completions", headers=_hdr(key), json=payload) as r:
+                if r.status_code != 200:
+                    body = (await r.aread()).decode("utf-8", "ignore")
+                    last = llm_error(r.status_code, body, vision)
                     continue
-                data = line[5:].strip()
-                if data == "[DONE]":
-                    break
-                try:
-                    piece = json.loads(data)["choices"][0]["delta"].get("content")
-                except Exception:
-                    continue
-                if piece:
-                    yield piece
-    except httpx.HTTPError:
-        raise LLMError("The AI server stopped responding. Is Colab still running?")
+                async for line in r.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        piece = json.loads(data)["choices"][0]["delta"].get("content")
+                    except Exception:
+                        continue
+                    if piece:
+                        got = True
+                        yield piece
+            return
+        except httpx.HTTPError:
+            if got:
+                raise LLMError("The AI stopped responding mid-answer. Please try again.")
+            last = f"Could not reach {name}."
+    raise LLMError(last)
 
 
 async def decide(http, q, history, has_docs):
@@ -184,7 +239,7 @@ PERSONA = (
     "You are strong at coding: when asked for code, give complete, working code in fenced code blocks "
     "with the language name, then a short plain explanation. "
     "If asked who made you, say you are GistKnit AI, created by Founder Ved Prakash. "
-    "If asked about the AI model under the hood, say you run on an open-source language model. "
+    "If asked about the AI model under the hood, say you are powered by a mix of leading AI models and do not name a specific one. "
     "Never invent facts; if you do not know something, say so honestly."
 )
 
@@ -220,13 +275,14 @@ def build_messages(question, sources, style, history, today, images, code=False)
 
 
 async def run(body, mine, q):
+    PREF.set(body.model)
     deep = body.mode == "research"
     today = time.strftime("%B %d, %Y")
     history = body.history[-6:]
     has_img = bool(body.images)
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as http:
-            if has_img or (body.code and body.source == "auto"):
+            if has_img or GREET.match(q) or (body.code and body.source == "auto"):
                 route, query = "CHAT", q
             else:
                 yield ev(type="status", text="Thinking")
@@ -272,9 +328,8 @@ async def run(body, mine, q):
             if notice:
                 yield ev(type="delta", text=notice)
             msgs = build_messages(q, sources, body.style, history, today, body.images, body.code)
-            model = LLM_VISION_MODEL if has_img else LLM_MODEL
             max_tokens = 2200 if body.code else (1200 if body.style == "Short" else 2000)
-            async for piece in llm_stream(http, msgs, max_tokens, model, 0.3 if body.code else 0.5):
+            async for piece in llm_stream(http, msgs, max_tokens, has_img, 0.3 if body.code else 0.5):
                 yield ev(type="delta", text=piece)
             yield ev(type="done")
     except LLMError as e:
@@ -282,7 +337,7 @@ async def run(body, mine, q):
     except RuntimeError as e:
         yield ev(type="error", text=str(e))
     except httpx.HTTPError:
-        yield ev(type="error", text="Could not reach your AI server. Is Colab running?")
+        yield ev(type="error", text="Could not reach the AI. Please try again.")
     except Exception:
         yield ev(type="error", text="Something went wrong on the server. Please try again.")
 
@@ -293,17 +348,19 @@ async def ask(body: AskBody, x_client_id: str = Header(None)):
     q = body.question.strip()
     if not q or len(q) > 1500:
         raise HTTPException(400, "Message must be between 1 and 1500 characters.")
-    if not LLM_URL:
-        raise HTTPException(503, "AI server address is not set yet (LLM_BASE_URL).")
+    if not PROV:
+        raise HTTPException(503, NO_AI)
     if len(body.images) > 3 or any((not u.startswith("data:image/")) or len(u) > 2_500_000 for u in body.images):
         raise HTTPException(400, "Up to 3 photos, each under about 1.8 MB.")
     mine = DOCS.get(cid, {})
     if body.source == "docs" and not mine:
         raise HTTPException(400, "Add a document first (the + button), or switch to Auto or Web.")
     now = time.time()
-    recent = [t for t in ASKS.get(cid, []) if now - t < 3600]
-    if len(recent) >= ASKS_PER_HOUR:
+    day = [t for t in ASKS.get(cid, []) if now - t < 86400]
+    if len([t for t in day if now - t < 3600]) >= ASKS_PER_HOUR:
         raise HTTPException(429, "Too many messages this hour. Please try again later.")
-    ASKS[cid] = recent + [now]
+    if len(day) >= ASKS_PER_DAY:
+        raise HTTPException(429, "Daily free limit reached. Please come back tomorrow.")
+    ASKS[cid] = day + [now]
     return StreamingResponse(run(body, mine, q), media_type="application/x-ndjson",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
