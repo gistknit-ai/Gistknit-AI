@@ -1,4 +1,4 @@
-"""GistKnit AI backend (Step 4): human-like streaming chat, photos, coding, web research with sources."""
+"""GistKnit AI backend (Step 5): human-like streaming chat, photos, coding mode, web research with sources."""
 import json
 import os
 import re
@@ -36,7 +36,7 @@ app.add_middleware(
 
 DOCS = {}   # client_id -> {doc_id: {...}}   (server restart par hat jata hai)
 ASKS = {}   # client_id -> [timestamps]
-GREET = re.compile(r"^\s*(hi+|hello|hey+|hlo|helo|namaste|wassup|what'?s up|thanks|thank you|ok|okay)\b", re.I)
+GREET = re.compile(r"^\s*(hi+|hello+|hey+|hlo+|helo|yo|sup|namaste|wassup|what'?s up|how are you|kaise ho|kya haal|thanks?|thank you|ok(ay)?|good (morning|night|evening|afternoon)|bye)\b", re.I)
 
 
 def client(cid):
@@ -96,6 +96,7 @@ class AskBody(BaseModel):
     source: str = "auto"      # "auto", "docs" or "web"
     history: list[Msg] = []
     images: list[str] = []    # photos as data:image/... (max 3)
+    code: bool = False        # coding mode
 
 
 class LLMError(Exception):
@@ -107,8 +108,6 @@ def ev(**k):
 
 
 def llm_error(status, text, vision=False):
-    if "ERR_NGROK_3200" in text or "is offline" in text:
-        return "Your AI server is offline right now. Start it in Colab (Run all) and try again."
     if vision and status == 404:
         return "The photo-reading model is not installed on your AI server yet. Run the photo-model cell in Colab, then try again."
     detail = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text)).strip()[:160]
@@ -190,7 +189,7 @@ PERSONA = (
 )
 
 
-def build_messages(question, sources, style, history, today, images):
+def build_messages(question, sources, style, history, today, images, code=False):
     tone = "Keep it concise." if style == "Short" else "Be thorough and well organised."
     if sources:
         system = (f"{PERSONA} Today is {today}. For this question, answer ONLY from the numbered sources below. "
@@ -200,6 +199,9 @@ def build_messages(question, sources, style, history, today, images):
         system = (f"{PERSONA} Today is {today}. You are not searching the internet in this reply. "
                   "Do not talk about documents or sources unless the user brings them up. "
                   f"If the user needs current facts, tell them you can search the web for it. {tone}")
+    if code:
+        system += (" The user is in coding mode: write clean, complete, working code in fenced code blocks with the language name, "
+                   "explain it briefly in plain words, and say how to run it. If the request is unclear, ask one short question.")
     msgs = [{"role": "system", "content": system}]
     for m in history[-6:]:
         role = "assistant" if m.role in ("assistant", "a") else "user"
@@ -224,7 +226,7 @@ async def run(body, mine, q):
     has_img = bool(body.images)
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as http:
-            if has_img:
+            if has_img or (body.code and body.source == "auto"):
                 route, query = "CHAT", q
             else:
                 yield ev(type="status", text="Thinking")
@@ -233,10 +235,12 @@ async def run(body, mine, q):
                     route = "DOCS"
                 elif body.source == "web":
                     route = "WEB"
+                elif GREET.match(q):
+                    route = "CHAT"
                 elif route == "DOCS" and not mine:
                     route = "CHAT"
 
-            sources, src = [], []
+            sources, src, notice = [], [], ""
             if route == "DOCS":
                 yield ev(type="status", text="Reading your documents")
                 items = [{"doc_id": d, "doc_name": doc["name"], **c} for d, doc in mine.items() for c in doc["chunks"]]
@@ -253,14 +257,24 @@ async def run(body, mine, q):
                     src = [{"t": h["doc_name"], "s": f"Page {h['page']}", "q": h["text"][:200] + "..."} for h in hits]
             if route == "WEB":
                 yield ev(type="status", text=f"Searching the web: {query}")
-                found = await web.gather(q, query, deep)
-                sources = [{"label": f"{f['title']} ({urlparse(f['url']).netloc})", "text": f["text"]} for f in found]
-                src = [{"t": f["title"], "s": urlparse(f["url"]).netloc, "url": f["url"], "q": f["text"][:200] + "..."} for f in found]
+                try:
+                    found = await web.gather(q, query, deep)
+                except RuntimeError:
+                    found = None
+                if found is None:
+                    route = "CHAT"
+                    notice = "*I could not reach the web right now, so this answer comes from my own knowledge and may be out of date.*\n\n"
+                else:
+                    sources = [{"label": f"{f['title']} ({urlparse(f['url']).netloc})", "text": f["text"]} for f in found]
+                    src = [{"t": f["title"], "s": urlparse(f["url"]).netloc, "url": f["url"], "q": f["text"][:200] + "..."} for f in found]
 
             yield ev(type="meta", route=route.lower(), query=query, src=src)
-            msgs = build_messages(q, sources, body.style, history, today, body.images)
+            if notice:
+                yield ev(type="delta", text=notice)
+            msgs = build_messages(q, sources, body.style, history, today, body.images, body.code)
             model = LLM_VISION_MODEL if has_img else LLM_MODEL
-            async for piece in llm_stream(http, msgs, 1200 if body.style == "Short" else 2000, model):
+            max_tokens = 2200 if body.code else (1200 if body.style == "Short" else 2000)
+            async for piece in llm_stream(http, msgs, max_tokens, model, 0.3 if body.code else 0.5):
                 yield ev(type="delta", text=piece)
             yield ev(type="done")
     except LLMError as e:

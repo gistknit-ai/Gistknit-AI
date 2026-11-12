@@ -1,7 +1,11 @@
 """GistKnit AI - web research helpers: search the web, read pages, pick the best passages."""
 import asyncio
 import ipaddress
+import json
 import re
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -61,20 +65,58 @@ def safe_url(url):
 
 def _ddg(query, n):
     from ddgs import DDGS
-    return list(DDGS().text(query, max_results=n))
+    return [{"title": r.get("title"), "url": r.get("href") or r.get("url"), "body": r.get("body")}
+            for r in DDGS().text(query, max_results=n)]
+
+
+def parse_news(xml_bytes, n):
+    root = ET.fromstring(xml_bytes)
+    out = []
+    for it in list(root.iter("item"))[:n]:
+        title = it.findtext("title") or ""
+        src = it.findtext("source") or ""
+        desc = html_to_text(it.findtext("description") or "")
+        out.append({"title": title, "url": it.findtext("link") or "", "body": (title + ". " + (src + ". " if src else "") + desc)[:600]})
+    return out
+
+
+def _gnews(query, n):
+    url = "https://news.google.com/rss/search?q=" + urllib.parse.quote(query) + "&hl=en-IN&gl=IN&ceid=IN:en"
+    data = urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=8).read()
+    return parse_news(data, n)
+
+
+def parse_wiki(data, lang):
+    pages = sorted(data.get("query", {}).get("pages", []), key=lambda p: p.get("index", 99))
+    return [{"title": p.get("title", ""), "url": f"https://{lang}.wikipedia.org/?curid={p['pageid']}", "body": p.get("extract", "")}
+            for p in pages if p.get("pageid")]
+
+
+def _wiki(query, n):
+    lang = "hi" if re.search(r"[\u0900-\u097F]", query) else "en"
+    params = urllib.parse.urlencode({"action": "query", "generator": "search", "gsrsearch": query, "gsrlimit": n,
+                                     "prop": "extracts", "exintro": 1, "explaintext": 1, "exchars": 1500,
+                                     "format": "json", "formatversion": 2})
+    url = f"https://{lang}.wikipedia.org/w/api.php?{params}"
+    data = json.loads(urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=8).read())
+    return parse_wiki(data, lang)
 
 
 async def web_search(query, n=6):
-    try:
-        res = await asyncio.to_thread(_ddg, query, n)
-    except Exception:
-        raise RuntimeError("Web search is not responding right now. Please try again in a minute.")
-    out = []
-    for r in res:
-        url = r.get("href") or r.get("url") or ""
-        if safe_url(url):
-            out.append({"title": (r.get("title") or url)[:160], "url": url, "snippet": (r.get("body") or "")[:400]})
-    return out
+    """Try DuckDuckGo first, then Google News, then Wikipedia. First one that returns results wins."""
+    for provider in (_ddg, _gnews, _wiki):
+        try:
+            res = await asyncio.to_thread(provider, query, n)
+        except Exception:
+            continue
+        out = []
+        for r in res or []:
+            url = r.get("url") or ""
+            if safe_url(url):
+                out.append({"title": (r.get("title") or url)[:160], "url": url, "snippet": (r.get("body") or "")[:1500]})
+        if out:
+            return out
+    raise RuntimeError("web_unavailable")
 
 
 async def fetch_text(client, url):
