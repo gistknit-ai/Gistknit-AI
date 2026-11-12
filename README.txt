@@ -1,14 +1,9 @@
-GistKnit AI - Premium UI + multi-AI (Gemini / Groq / OpenRouter)
+GistKnit AI - professional answers + identity + login nudge
 Founded by Ved Prakash
 
-GITHUB PAR UPLOAD (sirf ye 2 files replace karo):
-  app.js
-  backend/main.py
-UI (index.html, style.css, premium.css, premium.js) jaisa hai waisa rahega.
+GITHUB PAR UPLOAD (replace karo):
+  app.js, premium.css, backend/main.py
 
-RENDER > Environment me ye daalo (value = tumhari key):
-  GEMINI_API_KEY  (zaroori)
-  GROQ_API_KEY
-  OPENROUTER_API_KEY
-Phir Manual Deploy > Deploy latest commit.
+Render me OPENROUTER_MODEL = openrouter/free rakhna.
+Upload ke baad Render: Manual Deploy > Deploy latest commit.
 Firebase rules: is update me zarurat nahi.

@@ -233,8 +233,13 @@ function paintMsgs(){
     const srcs=hasSrc?`<details class="srcbox" id="srcs${i}"><summary>${m.src.slice(0,3).map((s,k)=>`<span class="pill">${k+1} ${esc((s.s||s.t).slice(0,22))}</span>`).join('')}<span>${m.src.length} source${m.src.length>1?'s':''}</span></summary><ol class="srcs">${m.src.map((s,k)=>`<li data-n="${k+1}"><b>${k+1}. ${safeUrl(s.url)?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.t)}</a>`:esc(s.t)}</b><span>${esc(s.s)}</span>${s.q?`<em class="snip">${esc(s.q)}</em>`:''}</li>`).join('')}</ol></details>`:'';
     const acts=m.done&&!m.err?`<div class="actions"><button data-act="copy" data-i="${i}">${ic('copy',15)}Copy</button></div>`:'';
     return `<div class="msg a ${m.err?'err':''}"><span class="av">${logo(28)}</span><div class="ai-body">${status}${meta}<div>${body}</div>${srcs}${acts}</div></div>`;
-  }).join('');
+  }).join('')+nudgeHtml();
   if(near)window.scrollTo(0,document.body.scrollHeight);
+}
+function nudgeHtml(){
+  if(S.user||S.nudgeOff||S.busy)return '';
+  if(S.thread.filter(m=>m.role==='u').length<3)return '';
+  return `<div class="nudge"><div><b>Save your chats and keep going</b><p>Create a free account to keep your history and get more from GistKnit AI.</p></div><div class="nudge-act"><a class="btn" href="#login">Sign up or log in</a><button type="button" class="btn ghost" data-act="nudgeoff">Not now</button></div></div>`;
 }
 function setBusy(b){S.busy=b;const s=$('#send');if(s)s.disabled=b}
 
@@ -364,6 +369,7 @@ document.addEventListener('click',e=>{
   if(a==='theme'){S.prefs.theme=b.dataset.v;store.set('prefs',S.prefs);applyTheme();render();return}
   if(a==='logout'){S.user=null;store.set('user',null);render();return}
   if(a==='wipe'){if(confirm('Delete chats, library and settings from this phone?')){S.convs=[];S.docs=[];S.user=null;S.thread=[];S.cur=null;S.prefs={style:'Short',theme:'system'};['history','docs','user','prefs'].forEach(k=>{try{localStorage.removeItem('gk_'+k)}catch(e){}});applyTheme();render()}return}
+  if(a==='nudgeoff'){S.nudgeOff=true;paintMsgs();return}
   if(a==='toggle'){S.signup=!S.signup;render();return}
 });
 document.addEventListener('submit',e=>{
