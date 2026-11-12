@@ -157,27 +157,30 @@ NO_AI = "No AI is connected yet. Add GEMINI_API_KEY or GROQ_API_KEY in Render > 
 
 
 async def llm(http, messages, max_tokens=700, temperature=0.2, vision=False):
-    last = NO_AI
+    errs = []
     for name, url, key, model in chain(vision):
         try:
             r = await http.post(url + "/chat/completions", headers=_hdr(key),
                                 json={"model": model, "messages": messages,
                                       "temperature": temperature, "max_tokens": max_tokens})
         except httpx.HTTPError:
-            last = f"Could not reach {name}."
+            errs.append(f"{name}: could not connect")
             continue
         if r.status_code != 200:
-            last = llm_error(r.status_code, r.text, vision)
+            errs.append(f"{name}: {llm_error(r.status_code, r.text, vision)}")
             continue
         try:
-            return r.json()["choices"][0]["message"]["content"].strip()
+            text = (r.json()["choices"][0]["message"].get("content") or "").strip()
         except Exception:
-            last = f"{name} sent an unreadable reply."
-    raise LLMError(last)
+            text = ""
+        if text:
+            return text
+        errs.append(f"{name}: empty reply")
+    raise LLMError(" | ".join(errs) or NO_AI)
 
 
 async def llm_stream(http, messages, max_tokens, vision=False, temperature=0.5):
-    last = NO_AI
+    errs = []
     for name, url, key, model in chain(vision):
         payload = {"model": model, "messages": messages, "temperature": temperature,
                    "max_tokens": max_tokens, "stream": True}
@@ -186,7 +189,7 @@ async def llm_stream(http, messages, max_tokens, vision=False, temperature=0.5):
             async with http.stream("POST", url + "/chat/completions", headers=_hdr(key), json=payload) as r:
                 if r.status_code != 200:
                     body = (await r.aread()).decode("utf-8", "ignore")
-                    last = llm_error(r.status_code, body, vision)
+                    errs.append(f"{name}: {llm_error(r.status_code, body, vision)}")
                     continue
                 async for line in r.aiter_lines():
                     if not line.startswith("data:"):
@@ -201,12 +204,14 @@ async def llm_stream(http, messages, max_tokens, vision=False, temperature=0.5):
                     if piece:
                         got = True
                         yield piece
-            return
+            if got:
+                return
+            errs.append(f"{name}: empty reply")
         except httpx.HTTPError:
             if got:
                 raise LLMError("The AI stopped responding mid-answer. Please try again.")
-            last = f"Could not reach {name}."
-    raise LLMError(last)
+            errs.append(f"{name}: could not connect")
+    raise LLMError(" | ".join(errs) or NO_AI)
 
 
 async def decide(http, q, history, has_docs):
@@ -222,7 +227,10 @@ async def decide(http, q, history, has_docs):
         f"User has uploaded documents: {'yes' if has_docs else 'no'}\n"
         f"Conversation so far:\n{recent}\n\nMessage: {q}"
     )
-    out = await llm(http, [{"role": "user", "content": prompt}], 60, 0)
+    try:
+        out = await llm(http, [{"role": "user", "content": prompt}], 200, 0)
+    except LLMError:
+        return "CHAT", q[:200]
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     word = lines[0].upper() if lines else ""
     route = next((r for r in ("WEB", "DOCS", "CHAT") if word.startswith(r)), None)
