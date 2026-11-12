@@ -1,9 +1,5 @@
-GistKnit AI - professional answers + identity + login nudge
-Founded by Ved Prakash
-
-GITHUB PAR UPLOAD (replace karo):
-  app.js, premium.css, backend/main.py
-
-Render me OPENROUTER_MODEL = openrouter/free rakhna.
-Upload ke baad Render: Manual Deploy > Deploy latest commit.
+GistKnit AI - fix: "unreadable reply" + better error messages
+GITHUB PAR UPLOAD (sirf ye 1 file replace karo):
+  backend/main.py
+Phir Render: Manual Deploy > Deploy latest commit.
 Firebase rules: is update me zarurat nahi.
