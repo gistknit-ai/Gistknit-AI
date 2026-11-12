@@ -47,7 +47,7 @@ function applyTheme(){
   const p=S.prefs.theme||'system';
   const dark=p==='dark'||(p==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme=dark?'dark':'light';
-  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=dark?'#0F1412':'#F7F7F5';
+  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=dark?'#05060F':'#05060F';
 }
 if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').addEventListener)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 

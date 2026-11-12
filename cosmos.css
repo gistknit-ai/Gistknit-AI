@@ -1,0 +1,25 @@
+/* GistKnit AI - Cosmos theme (loads after style.css) */
+:root,html[data-theme=dark],html[data-theme=light]{--bg:#05060F;--panel:rgba(18,20,44,.62);--side:rgba(7,8,22,.8);--ink:#E8ECFF;--mute:#9AA3C7;--line:rgba(140,150,255,.17);--brand:#6C5CFF;--brand-d:#8FE9F2;--accent:#F0C94A;--user:rgba(108,92,255,.22);--soft:rgba(140,150,255,.1);--warn:#2A2540;--danger:#FF8E9E;--shadow:0 12px 40px rgba(0,0,0,.6)}
+body{font-family:"Manrope",system-ui,sans-serif;background:radial-gradient(1100px 700px at 80% -10%,rgba(108,92,255,.3),transparent 60%),radial-gradient(900px 600px at 0% 110%,rgba(40,200,220,.16),transparent 60%),#05060F;background-attachment:fixed}
+h1,h2,h3,.brand,.bar-title{font-family:"Unbounded","Manrope",system-ui,sans-serif;font-weight:600}
+#cosmos{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.shell{position:relative;z-index:1}
+.bar{background:transparent}
+.side{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+svg rect[fill="#2F6B5B"]{fill:#5B4DFF}
+.newchat{background:linear-gradient(120deg,#6C5CFF,#2FC8DC);color:#05060F;box-shadow:0 0 24px rgba(108,92,255,.4)}
+.hero{padding-top:32vh}
+.hero .mark{display:none}
+.hero h1{font-size:clamp(1.4rem,5.2vw,2.5rem);letter-spacing:-.01em;text-shadow:0 0 40px rgba(108,92,255,.55)}
+.card-btn,.composer,.panel,.drop{background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-color:var(--line)}
+.card-btn{transition:border-color .2s,box-shadow .2s,transform .2s}
+.card-btn:hover{border-color:#8FE9F2;box-shadow:0 0 26px rgba(108,92,255,.35);transform:translateY(-2px)}
+.card-btn .ico{background:rgba(108,92,255,.2);color:#8FE9F2}
+.composer{box-shadow:0 0 0 1px rgba(140,150,255,.08),0 10px 40px rgba(0,0,0,.5)}
+.composer:focus-within{border-color:#8FE9F2;box-shadow:0 0 30px rgba(92,225,230,.25)}
+.dock{background:linear-gradient(transparent,rgba(5,6,15,.88) 45%)}
+.send{background:linear-gradient(120deg,#6C5CFF,#2FC8DC)!important;color:#05060F!important}
+.msg.u{background:var(--user);border:1px solid var(--line)}
+.intro{position:fixed;inset:0;z-index:50;display:grid;place-content:center;gap:10px;text-align:center;pointer-events:none;color:#E8ECFF;transition:opacity .9s}
+.intro b{font:600 clamp(1.5rem,7vw,2.6rem) "Unbounded",sans-serif;letter-spacing:.28em;text-shadow:0 0 36px rgba(108,92,255,.95)}
+.intro span{color:#9AA3C7;font-size:.95rem}
