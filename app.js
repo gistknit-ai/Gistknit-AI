@@ -10,7 +10,7 @@ const S={
   user:store.get('user',null),
   convs:store.get('history',[]).map(h=>h.msgs?h:{id:h.id,title:h.q,t:h.t,msgs:[{role:'u',text:h.q},{role:'a',text:h.a,src:h.src||[],done:true}]}),
   docs:store.get('docs',[]),
-  prefs:Object.assign({style:'Short',theme:'system'},store.get('prefs',{})),
+  prefs:Object.assign({style:'Short',theme:'system',model:'auto'},store.get('prefs',{})),
   thread:[],cur:null,tool:'',busy:false,signup:false,upMsg:'',loaded:false,pend:[],menu:false
 };
 S.cid=store.get('cid',null);
@@ -255,7 +255,7 @@ async function ask(q,toolOverride){
   try{
     if(API){
       let errText=null;
-      await streamAsk({question:q,mode:t==='deep'?'research':'chat',style:S.prefs.style,source:(t==='web'||t==='deep')?'web':(t==='docs'?'docs':'auto'),code:t==='code',history:hist,images:imgs},ev=>{
+      await streamAsk({question:q,mode:t==='deep'?'research':'chat',style:S.prefs.style,source:(t==='web'||t==='deep')?'web':(t==='docs'?'docs':'auto'),code:t==='code',model:S.prefs.model||'auto',history:hist,images:imgs},ev=>{
         if(ev.type==='status')m.status=ev.text;
         else if(ev.type==='meta'){m.src=ev.src||[];m.meta={route:ev.route,query:ev.query}}
         else if(ev.type==='delta'){m.text+=ev.text}
@@ -322,7 +322,7 @@ function vSettings(){
   return `<div class="page"><h2>Settings</h2><p class="lead">Make GistKnit AI yours.</p>
   <div class="panel"><h3>Account</h3>${u?`<div class="profile"><span class="av">${esc(initials())}</span><div><b>${esc(u.name||u.email.split('@')[0])}</b><br><small>${esc(u.email)}</small></div></div><button class="btn ghost" data-act="logout">Log out</button>`:`<p>You are not signed in.</p><a class="btn" href="#login">Log in or sign up</a>`}</div>
   <div class="panel"><h3>Appearance</h3><div class="seg" role="group" aria-label="Theme">${[['system','System'],['light','Light'],['dark','Dark']].map(([k,l])=>`<button data-act="theme" data-v="${k}" class="${th===k?'on':''}" aria-pressed="${th===k}">${l}</button>`).join('')}</div></div>
-  <div class="panel"><h3>Answers</h3><label class="f" for="style" style="margin-top:0">Answer length</label><select id="style">${['Short','Detailed'].map(o=>`<option ${S.prefs.style===o?'selected':''}>${o}</option>`).join('')}</select></div>
+  <div class="panel"><h3>Answers</h3><label class="f" for="style" style="margin-top:0">Answer length</label><select id="style">${['Short','Detailed'].map(o=>`<option ${S.prefs.style===o?'selected':''}>${o}</option>`).join('')}</select><label class="f" for="model">AI model</label><select id="model">${[['auto','Auto (best available)'],['gemini','Gemini'],['groq','Llama on Groq'],['openrouter','OpenRouter free']].map(([k,l])=>`<option value="${k}" ${(S.prefs.model||'auto')===k?'selected':''}>${l}</option>`).join('')}</select></div>
   <div class="panel"><h3>Your data</h3><p>Chats and settings are stored only in this browser.</p><button class="btn ghost" data-act="clearh">Delete all chats</button> <button class="btn ghost" data-act="wipe">Delete everything</button></div>
   <div class="panel about"><span>${logo(44)}</span><div><h3 style="margin:0">GistKnit AI</h3><p style="margin:.2rem 0">Version 1.0 (Beta)</p><p style="margin:0">An AI research assistant that finds, reads and cites its sources.</p><p style="margin:.5rem 0 0"><b>Founded by Ved Prakash</b></p></div></div></div>`;
 }
@@ -396,6 +396,7 @@ document.addEventListener('change',e=>{
     })();
   }
   if(e.target.id==='style'){S.prefs.style=e.target.value;store.set('prefs',S.prefs)}
+  if(e.target.id==='model'){S.prefs.model=e.target.value;store.set('prefs',S.prefs)}
 });
 window.addEventListener('hashchange',()=>{openSide(false);render()});
 applyTheme();
