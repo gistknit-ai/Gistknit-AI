@@ -47,7 +47,7 @@ function applyTheme(){
   const p=S.prefs.theme||'system';
   const dark=p==='dark'||(p==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme=dark?'dark':'light';
-  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=dark?'#05060F':'#05060F';
+  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=dark?'#0F1412':'#F7F7F5';
 }
 if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').addEventListener)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 
@@ -114,7 +114,7 @@ function paintShell(){
   const r=route();
   $('#closeBtn').innerHTML=ic('close');$('#menuBtn').innerHTML=ic('menu',22);$('#composeBtn').innerHTML=ic('compose',22);
   $('#newBtn').innerHTML=ic('plus',18)+'<span>New chat</span>';
-  $('#sideNav').innerHTML=`<a href="#library" class="${r==='library'?'on':''}">${ic('lib')}Library</a><a href="#settings" class="${r==='settings'?'on':''}">${ic('gear')}Settings</a>`;
+  $('#sideNav').innerHTML=`<a href="#library" class="${r==='library'?'on':''}">${ic('lib')}Library</a><a href="#upgrade" class="${r==='upgrade'?'on':''}">${ic('learn')}Upgrade plan <span class="nav-free">FREE</span></a><a href="#settings" class="${r==='settings'?'on':''}">${ic('gear')}Settings</a>`;
   const nm=S.user?(S.user.name||S.user.email.split('@')[0]):'Guest';
   $('#acct').innerHTML=`<span class="av">${esc(initials())}</span><span><b>${esc(nm)}</b><small>${S.user?'Signed in':'Log in or sign up'}</small></span>`;
   $('#acct').href=S.user?'#settings':'#login';
@@ -128,7 +128,7 @@ function paintSide(){
 function render(){
   const r=route();
   paintShell();
-  const v=({chat:vChat,library:vLibrary,settings:vSettings,login:vLogin})[r]||vChat;
+  const v=({chat:vChat,library:vLibrary,settings:vSettings,login:vLogin,upgrade:vUpgrade})[r]||vChat;
   $('#view').innerHTML=v();
   if(r==='chat'){paintMsgs();paintUp();paintPend();paintTool();window.scrollTo(0,document.body.scrollHeight)}
   else window.scrollTo(0,0);
@@ -292,6 +292,31 @@ function vLibrary(){
   ${S.upMsg?`<div class="note" role="alert">${esc(S.upMsg)}</div>`:''}
   <label class="drop">${S.busy?'Working...':'Add documents (PDF or TXT, up to 10 MB)'}<input type="file" id="file" multiple accept=".pdf,.txt"></label>${list}</div>`;
 }
+function vUpgrade(){
+  return `<div class="upgrade-page">
+    <div class="upgrade-eyebrow"><span class="spark">✦</span> GISTKNIT MEMBERSHIP</div>
+    <h1>Make room for <span>more ideas.</span></h1>
+    <p class="upgrade-lead">Choose the experience that fits how you think, learn and create.</p>
+    <div class="plan-grid">
+      <section class="plan-card current-plan">
+        <div class="plan-top"><span class="plan-label">CURRENT PLAN</span><span class="plan-status">Active</span></div>
+        <h2>Free</h2><p class="plan-price">₹0 <small>/ forever</small></p>
+        <p class="plan-desc">A simple place to start exploring with GistKnit AI.</p>
+        <ul><li>Everyday AI chat</li><li>Chat history on this device</li><li>Core assistant features</li></ul>
+        <button class="plan-button secondary" disabled>Your current plan</button>
+      </section>
+      <section class="plan-card premium-plan">
+        <div class="plan-top"><span class="plan-label">FOR POWER USERS</span><span class="coming">COMING SOON</span></div>
+        <h2>GistKnit Plus</h2><p class="plan-price">More <small>possibilities</small></p>
+        <p class="plan-desc">A more capable workspace for deeper work and longer sessions.</p>
+        <ul><li>Higher usage limits</li><li>Priority access when available</li><li>Advanced research tools</li><li>More space for your workflow</li></ul>
+        <button class="plan-button primary" disabled>Premium is coming soon</button>
+      </section>
+    </div>
+    <p class="upgrade-note">No payment is collected on this page. Upgrade plans will appear here when subscriptions are ready.</p>
+  </div>`;
+}
+
 function vSettings(){
   const u=S.user,th=S.prefs.theme;
   return `<div class="page"><h2>Settings</h2><p class="lead">Make GistKnit AI yours.</p>

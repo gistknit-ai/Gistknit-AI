@@ -4,17 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GistKnit AI</title>
-<meta name="theme-color" content="#05060F">
+<meta name="theme-color" content="#F7F7F5">
 <meta name="description" content="GistKnit AI: ask anything, research with sources, write code. Founded by Ved Prakash.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232F6B5B'/%3E%3Cpath d='M8 9l8 14 8-14M8 23l8-14 8 14' stroke='%23F0C94A' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>try{var p=JSON.parse(localStorage.getItem('gk_prefs')||'{}').theme||'system';var d=p==='dark'||(p==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light'}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="cosmos.css">
+<link rel="stylesheet" href="premium.css">
 </head>
 <body>
+<div class="launch-screen" id="launchScreen" aria-hidden="true">
+  <div class="launch-orbit"><span class="launch-core">G</span><i></i><i></i><i></i></div>
+  <div class="launch-name">GistKnit <b>AI</b></div>
+  <div class="launch-caption">A clearer way to think.</div>
+  <div class="launch-progress"><span></span></div>
+</div>
 <div class="shell">
   <aside class="side" id="side" aria-label="Menu">
     <div class="side-top">
@@ -36,14 +42,18 @@
   <div class="main">
     <header class="bar">
       <button class="icon-btn menu-btn" data-act="openside" aria-label="Open menu" id="menuBtn"></button>
-      <span class="bar-title">GistKnit AI</span>
-      <button class="icon-btn" data-act="new" aria-label="New chat" id="composeBtn"></button>
+      <a class="bar-brand" href="#chat" aria-label="GistKnit AI home"><span class="brand-dot">G</span><span>GistKnit <b>AI</b></span></a>
+      <div class="bar-actions">
+        <span class="plan-chip"><i></i> FREE</span>
+        <a class="upgrade-btn" href="#upgrade">Upgrade <span>↗</span></a>
+        <button class="icon-btn compose-top" data-act="new" aria-label="New chat" id="composeBtn"></button>
+      </div>
     </header>
     <main id="view"></main>
   </div>
 </div>
 <script src="config.js"></script>
-<script src="cosmos.js"></script>
+<script src="premium.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
